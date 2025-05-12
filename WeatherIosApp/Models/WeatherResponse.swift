@@ -35,6 +35,7 @@ struct Forecast: Decodable {
 struct ForecastDay: Decodable {
     let date: String
     let day: Day
+    let astro: Astro
     let hour: [Hour]
 }
 
@@ -42,6 +43,11 @@ struct Day: Decodable {
     let maxtemp_c: Double
     let mintemp_c: Double
     let condition: Condition
+}
+
+struct Astro: Decodable {
+    let sunrise: String
+    let sunset: String
 }
 
 struct Hour: Decodable {

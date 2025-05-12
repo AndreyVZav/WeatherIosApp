@@ -12,7 +12,7 @@ final class WeatherService {
     private let apiKey = "fa8b3df74d4042b9aa7135114252304"
     
     func fetchWeather(for location: CLLocationCoordinate2D, completion: @escaping (Result<WeatherResponse, Error>) -> Void) {
-        let urlString = "http://api.weatherapi.com/v1/forecast.json?key=\(apiKey)&q=\(location.latitude),\(location.longitude)&days=7&aqi=no&alerts=no"
+        let urlString = "https://api.weatherapi.com/v1/forecast.json?key=\(apiKey)&q=\(location.latitude),\(location.longitude)&days=7&aqi=no&alerts=no"
         
         guard let url = URL(string: urlString) else { return }
         

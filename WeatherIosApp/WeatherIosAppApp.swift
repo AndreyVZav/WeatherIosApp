@@ -11,7 +11,8 @@ import SwiftUI
 struct WeatherIosAppApp: App {
     var body: some Scene {
         WindowGroup {
-            ContentView()
+            WeatherViewControllerWrapper()
+                .ignoresSafeArea()
         }
     }
 }
