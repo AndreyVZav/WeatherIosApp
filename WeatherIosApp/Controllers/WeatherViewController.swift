@@ -75,13 +75,25 @@ final class WeatherViewController: UIViewController {
             ))
             
             // прогноз по часам
-            let hourModels = data.forecast.forecastday.first?.hour.map {
+            let now = Date()
+            let calendar = Calendar.current
+            let currentHour = calendar.component(.hour, from: now)
+            
+            let todayHours = data.forecast.forecastday.first?.hour.filter {
+                let hour = Int($0.time.split(separator: " ").last?.prefix(2) ?? "") ?? 0
+                return hour >= currentHour
+            } ?? []
+            
+            let tomorrowHours = data.forecast.forecastday.count > 1 ? data.forecast.forecastday[1].hour : []
+            let combinedHours = todayHours + tomorrowHours
+            
+            let hourModels = combinedHours.map {
                 HourlyWeatherUIModel(
                     time: String($0.time.split(separator: " ").last ?? ""),
                     temperature: "\(Int($0.temp_c))°C",
                     iconPath: $0.condition.icon
                 )
-            } ?? []
+            }
             self?.hourlyForecastView.configure(with: hourModels)
             
             // Прогноз по дням
