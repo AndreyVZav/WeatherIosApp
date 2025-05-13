@@ -5,51 +5,77 @@
 //  Created by Андрей Завадский on 12.05.2025.
 //
 
-import Foundation
 import CoreLocation
 
-final class WeatherViewModel: NSObject, ObservableObject {
-    private let locationManager = CLLocationManager()
-    private let weatherService = WeatherService()
-    
+final class WeatherViewModel: NSObject, CLLocationManagerDelegate {
     var onUpdate: ((WeatherResponse) -> Void)?
     var onError: ((String) -> Void)?
     
-    override init() {
-        super.init()
-        locationManager.delegate = self
-    }
+    private let locationManager = CLLocationManager()
+    private let weatherService = WeatherService()
+    private var didRequest = false
     
     func requestLocation() {
-        locationManager.requestWhenInUseAuthorization()
-        locationManager.requestLocation()
+        locationManager.delegate = self
+        locationManager.desiredAccuracy = kCLLocationAccuracyHundredMeters
+        
+        let status = locationManager.authorizationStatus
+        if status == .notDetermined {
+            locationManager.requestWhenInUseAuthorization()
+        } else if status == .authorizedWhenInUse || status == .authorizedAlways {
+            locationManager.requestLocation()
+        } else {
+            // Пользователь запретил — используем Москву
+            fetchWeatherForMoscow()
+        }
     }
     
-    private func fetchWeather(lat: Double, lon: Double) {
-        weatherService.fetchWeather(for: CLLocationCoordinate2D(latitude: lat, longitude: lon)) { [weak self] result in
+    func locationManager(_ manager: CLLocationManager, didChangeAuthorization status: CLAuthorizationStatus) {
+        switch status {
+        case .authorizedWhenInUse, .authorizedAlways:
+            locationManager.requestLocation()
+        case .denied, .restricted:
+            fetchWeatherForMoscow()
+        default:
+            break
+        }
+    }
+    
+    func locationManager(_ manager: CLLocationManager, didFailWithError error: Error) {
+        print("Ошибка геолокации: \(error)")
+        fetchWeatherForMoscow()
+    }
+    
+    func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
+        guard !didRequest else { return }
+        didRequest = true
+        if let location = locations.first?.coordinate {
+            weatherService.fetchWeather(for: location) { [weak self] result in
+                DispatchQueue.main.async {
+                    switch result {
+                    case .success(let response):
+                        self?.onUpdate?(response)
+                    case .failure(let error):
+                        self?.onError?(error.localizedDescription)
+                    }
+                }
+            }
+        } else {
+            fetchWeatherForMoscow()
+        }
+    }
+    
+    private func fetchWeatherForMoscow() {
+        let moscowCoordinates = CLLocationCoordinate2D(latitude: 55.7558, longitude: 37.6173)
+        weatherService.fetchWeather(for: moscowCoordinates) { [weak self] result in
             DispatchQueue.main.async {
                 switch result {
-                case .success(let data):
-                    self?.onUpdate?(data)
+                case .success(let response):
+                    self?.onUpdate?(response)
                 case .failure(let error):
                     self?.onError?(error.localizedDescription)
                 }
             }
         }
-    }
-}
-
-extension WeatherViewModel: CLLocationManagerDelegate {
-    func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
-        guard let location = locations.first else {
-            onError?("Не удалось получить геопозицию")
-            return
-        }
-        fetchWeather(lat: location.coordinate.latitude, lon: location.coordinate.longitude)
-    }
-    
-    func locationManager(_ manager: CLLocationManager, didFailWithError error: Error) {
-        // Москва как fallback
-        fetchWeather(lat: 55.7558, lon: 37.6173)
     }
 }
