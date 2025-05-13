@@ -11,6 +11,8 @@ final class WeatherViewController: UIViewController {
     private let viewModel = WeatherViewModel()
     private let loadingView = UIActivityIndicatorView(style: .large)
     private let errorLabel = UILabel()
+    private let retryButton = UIButton(type: .system)
+    
     private let currentWeatherView = CurrentWeatherView()
     private let hourlyForecastView = HourlyForecastView()
     private let dailyForecastView = DailyForecastView()
@@ -33,41 +35,79 @@ final class WeatherViewController: UIViewController {
         stackView.axis = .vertical
         stackView.spacing = 16
         stackView.translatesAutoresizingMaskIntoConstraints = false
-
+        
         view.addSubview(scrollView)
         scrollView.addSubview(stackView)
-
+        
         NSLayoutConstraint.activate([
             scrollView.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor),
             scrollView.bottomAnchor.constraint(equalTo: view.bottomAnchor),
             scrollView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             scrollView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
-
+            
             stackView.topAnchor.constraint(equalTo: scrollView.topAnchor),
             stackView.bottomAnchor.constraint(equalTo: scrollView.bottomAnchor),
             stackView.leadingAnchor.constraint(equalTo: scrollView.leadingAnchor),
             stackView.trailingAnchor.constraint(equalTo: scrollView.trailingAnchor),
             stackView.widthAnchor.constraint(equalTo: scrollView.widthAnchor)
         ])
-
+        
         // Добавляем в stackView нужные компоненты
         stackView.addArrangedSubview(currentWeatherView)
         stackView.addArrangedSubview(hourlyForecastView)
         stackView.addArrangedSubview(dailyForecastView)
-
-        currentWeatherView.translatesAutoresizingMaskIntoConstraints = false
-        hourlyForecastView.translatesAutoresizingMaskIntoConstraints = false
-        dailyForecastView.translatesAutoresizingMaskIntoConstraints = false
-
+        
+        //        currentWeatherView.translatesAutoresizingMaskIntoConstraints = false
+        //        hourlyForecastView.translatesAutoresizingMaskIntoConstraints = false
+        //        dailyForecastView.translatesAutoresizingMaskIntoConstraints = false
+        
         hourlyForecastView.heightAnchor.constraint(equalToConstant: 110).isActive = true
+        dailyForecastView.heightAnchor.constraint(equalToConstant: 500).isActive = true
+        
+        // Добавляем loadingView
+        loadingView.translatesAutoresizingMaskIntoConstraints = false
+        view.addSubview(loadingView)
+        NSLayoutConstraint.activate([
+            loadingView.centerXAnchor.constraint(equalTo: view.centerXAnchor),
+            loadingView.centerYAnchor.constraint(equalTo: view.centerYAnchor)
+        ])
+        
+        // Добавляем errorLabel
+        errorLabel.translatesAutoresizingMaskIntoConstraints = false
+        errorLabel.textAlignment = .center
+        errorLabel.numberOfLines = 0
+        errorLabel.isHidden = true
+        view.addSubview(errorLabel)
+        
+        NSLayoutConstraint.activate([
+            errorLabel.centerXAnchor.constraint(equalTo: view.centerXAnchor),
+            errorLabel.centerYAnchor.constraint(equalTo: view.centerYAnchor, constant: -40),
+            errorLabel.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 16),
+            errorLabel.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -16)
+        ])
+        
+        // Добавляем кнопку повтора
+        retryButton.setTitle("Повторить", for: .normal)
+        retryButton.isHidden = true
+        retryButton.translatesAutoresizingMaskIntoConstraints = false
+        retryButton.addTarget(self, action: #selector(didTapRetry), for: .touchUpInside)
+        view.addSubview(retryButton)
+        
+        NSLayoutConstraint.activate([
+            retryButton.topAnchor.constraint(equalTo: errorLabel.bottomAnchor, constant: 16),
+            retryButton.centerXAnchor.constraint(equalTo: view.centerXAnchor)
+        ])
     }
     
     private func bindViewModel() {
         viewModel.onUpdate = { [weak self] data in
-            self?.loadingView.stopAnimating()
-            self?.errorLabel.isHidden = true
+            guard let self else { return }
+            self.loadingView.stopAnimating()
+            self.errorLabel.isHidden = true
+            self.retryButton.isHidden = true
+            self.scrollView.isHidden = false
             
-            self?.currentWeatherView.configure(with: CurrentWeatherUIModel(
+            self.currentWeatherView.configure(with: CurrentWeatherUIModel(
                 city: data.location.name,
                 temperature: "\(Int(data.current.temp_c))°C",
                 conditionText: data.current.condition.text,
@@ -94,7 +134,7 @@ final class WeatherViewController: UIViewController {
                     iconPath: $0.condition.icon
                 )
             }
-            self?.hourlyForecastView.configure(with: hourModels)
+            self.hourlyForecastView.configure(with: hourModels)
             
             // Прогноз по дням
             let dayModels = data.forecast.forecastday.map {
@@ -105,17 +145,27 @@ final class WeatherViewController: UIViewController {
                     iconPath: $0.day.condition.icon
                 )
             }
-            self?.dailyForecastView.configure(with: dayModels)
+            self.dailyForecastView.configure(with: dayModels)
             print("Дней в forecast:", data.forecast.forecastday.count)
         }
         
         viewModel.onError = { [weak self] message in
             self?.loadingView.stopAnimating()
+            self?.scrollView.isHidden = true
             self?.errorLabel.text = "Ошибка: \(message)\nПопробуйте еще раз."
-            
+            self?.errorLabel.isHidden = false
+            self?.retryButton.isHidden = false
         }
         
         loadingView.startAnimating()
+    }
+    
+    @objc private func didTapRetry() {
+        errorLabel.isHidden = true
+        retryButton.isHidden = true
+        scrollView.isHidden = true
+        loadingView.startAnimating()
+        viewModel.requestLocation()
     }
     
 }
